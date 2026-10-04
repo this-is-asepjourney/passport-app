@@ -48,14 +48,7 @@ function isNameMatch(inputName: string, storedName: string): boolean {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fullName, phone, city } = body;
-
-    if (!fullName || typeof fullName !== 'string' || fullName.trim().length < 2) {
-      return NextResponse.json(
-        { error: 'Nama lengkap wajib diisi minimal 2 karakter' },
-        { status: 400 }
-      );
-    }
+    const { fullName, phone, city, password } = body;
 
     if (!phone || typeof phone !== 'string' || phone.trim().length < 8) {
       return NextResponse.json(
@@ -64,9 +57,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!fullName || typeof fullName !== 'string' || fullName.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'Nama lengkap wajib diisi minimal 2 karakter' },
+        { status: 400 }
+      );
+    }
+
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      return NextResponse.json(
+        { error: 'Password wajib diisi minimal 6 karakter' },
+        { status: 400 }
+      );
+    }
+
     if (!city || typeof city !== 'string' || city.trim().length < 2) {
       return NextResponse.json(
-        { error: 'Kota wajib diisi minimal 2 karakter' },
+        { error: 'Kota domisili wajib diisi minimal 2 karakter' },
         { status: 400 }
       );
     }
@@ -120,29 +127,50 @@ export async function POST(request: NextRequest) {
       let uid = customerId;
 
       // Ensure Firebase Auth user exists
+      // Ensure Firebase Auth user exists with password
       try {
         await adminAuth().getUser(uid);
+        if (password) {
+          await adminAuth().updateUser(uid, { password, displayName: trimmedName });
+        }
       } catch {
         try {
           await adminAuth().createUser({
             uid,
             displayName: trimmedName,
             email: dummyEmail,
+            ...(password ? { password } : {}),
           });
         } catch (userErr: any) {
           if (userErr.code === 'auth/email-already-in-use') {
             const existingAuth = await adminAuth().getUserByEmail(dummyEmail);
             uid = existingAuth.uid;
+            if (password) {
+              await adminAuth().updateUser(uid, { password, displayName: trimmedName });
+            }
           } else {
             await adminAuth().createUser({
               uid,
               displayName: trimmedName,
+              ...(password ? { password } : {}),
             });
           }
         }
       }
 
       await adminAuth().setCustomUserClaims(uid, { role: 'customer' });
+
+      // Sync to users collection
+      await db.collection('users').doc(uid).set({
+        uid,
+        name: trimmedName,
+        displayName: trimmedName,
+        phone: normalizedPhone,
+        role: 'customer',
+        city: trimmedCity,
+        isActive: true,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
 
       // Update customer doc to active
       await existingDoc.ref.update({
@@ -232,30 +260,51 @@ export async function POST(request: NextRequest) {
     const memberNo = generateMemberNo();
     let uid = customerId;
 
-    // Ensure Firebase Auth user exists
+    // Ensure Firebase Auth user exists with password
     try {
       await adminAuth().getUser(uid);
+      if (password) {
+        await adminAuth().updateUser(uid, { password, displayName: trimmedName });
+      }
     } catch {
       try {
         await adminAuth().createUser({
           uid,
           displayName: trimmedName,
           email: dummyEmail,
+          ...(password ? { password } : {}),
         });
       } catch (userErr: any) {
         if (userErr.code === 'auth/email-already-in-use') {
           const existingAuth = await adminAuth().getUserByEmail(dummyEmail);
           uid = existingAuth.uid;
+          if (password) {
+            await adminAuth().updateUser(uid, { password, displayName: trimmedName });
+          }
         } else {
           await adminAuth().createUser({
             uid,
             displayName: trimmedName,
+            ...(password ? { password } : {}),
           });
         }
       }
     }
 
     await adminAuth().setCustomUserClaims(uid, { role: 'customer' });
+
+    // Sync to users collection
+    await db.collection('users').doc(uid).set({
+      uid,
+      name: trimmedName,
+      displayName: trimmedName,
+      phone: normalizedPhone,
+      role: 'customer',
+      city: trimmedCity,
+      isActive: true,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
 
     await db.runTransaction(async (tx) => {
       const customerRef = db.collection('customers').doc(customerId);

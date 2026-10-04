@@ -25,10 +25,7 @@ import {
   Sparkles,
   Printer,
   Share2,
-  CreditCard,
-  Banknote,
   Smartphone,
-  Building,
   RotateCcw,
   ChevronDown,
   Receipt,
@@ -95,8 +92,6 @@ function BaScanAndBarcodeContent() {
   // Cart Management
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [customInvoiceNo, setCustomInvoiceNo] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'qris' | 'cash' | 'debit' | 'transfer'>('qris');
-  const [cashTendered, setCashTendered] = useState<number | ''>('');
   const [transactionNotes, setTransactionNotes] = useState('');
 
   // Submit and Void states
@@ -224,7 +219,6 @@ function BaScanAndBarcodeContent() {
       setCartItems([]);
       setErrorMsg(null);
       setCustomInvoiceNo(`WRD-${Date.now().toString().slice(-6)}`);
-      setCashTendered('');
       setTransactionNotes('');
       loadCustomerPurchases(c.id);
       loadCustomerRecommendations(c.id, prodsList || productsRef.current);
@@ -442,10 +436,6 @@ function BaScanAndBarcodeContent() {
   const totalAmount = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
   const totalQty = cartItems.reduce((sum, item) => sum + item.qty, 0);
   const pointsEarned = Math.floor(totalAmount / 10000);
-  const cashChange =
-    paymentMethod === 'cash' && typeof cashTendered === 'number'
-      ? Math.max(0, cashTendered - totalAmount)
-      : 0;
 
   // Separate Today's purchases from past purchases
   const isSameDay = (dateStr: string, targetDate = new Date()) => {
@@ -470,11 +460,6 @@ function BaScanAndBarcodeContent() {
   const handleSubmitPurchase = async () => {
     if (!selectedCustomer || cartItems.length === 0) return;
 
-    if (paymentMethod === 'cash' && typeof cashTendered === 'number' && cashTendered < totalAmount) {
-      setErrorMsg(`Uang tunai yang diterima (Rp ${cashTendered.toLocaleString('id-ID')}) kurang dari total belanja.`);
-      return;
-    }
-
     setIsSubmittingPurchase(true);
     setErrorMsg(null);
 
@@ -495,10 +480,8 @@ function BaScanAndBarcodeContent() {
           storeId: user?.storeId || undefined,
           invoiceNo: invNo,
           purchasedAt: new Date().toISOString(),
-          paymentMethod,
+          paymentMethod: 'counter',
           notes: transactionNotes.trim() || undefined,
-          cashReceived: paymentMethod === 'cash' && typeof cashTendered === 'number' ? cashTendered : undefined,
-          cashChange: paymentMethod === 'cash' ? cashChange : undefined,
           items: cartItems,
         }),
       });
@@ -521,10 +504,8 @@ function BaScanAndBarcodeContent() {
         purchasedAt: new Date().toISOString(),
         totalAmount,
         status: 'valid',
-        paymentMethod,
+        paymentMethod: 'counter',
         notes: transactionNotes.trim() || undefined,
-        cashReceived: paymentMethod === 'cash' && typeof cashTendered === 'number' ? cashTendered : undefined,
-        cashChange: paymentMethod === 'cash' ? cashChange : undefined,
         items: [...cartItems],
         createdAt: new Date().toISOString(),
       };
@@ -536,7 +517,6 @@ function BaScanAndBarcodeContent() {
       // Reset cart and form
       setCartItems([]);
       setCustomInvoiceNo(`WRD-${Date.now().toString().slice(-6)}`);
-      setCashTendered('');
       setTransactionNotes('');
 
       // Update selected customer state immediately
@@ -623,7 +603,7 @@ function BaScanAndBarcodeContent() {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://wardahbeauty.com';
     const passportLink = `${origin}/passport/purchases?c=${cust.id}&scanned=true`;
 
-    const text = `Halo Kak *${cust.fullName}*! ✨\n\nTerima kasih telah berkunjung dan berbelanja produk Wardah di counter resmi kami hari ini.\n\nBerikut rincian struk belanja Kakak:\n📄 *No. Struk*: #${purchase.invoiceNo}\n📅 *Waktu*: ${formatDateTime(purchase.purchasedAt)}\n\n🛍️ *Daftar Produk yang Dibeli*:\n${itemsSummary}\n\n💰 *Total Belanja*: *${formatIDR(purchase.totalAmount)}*\n💳 *Metode Pembayaran*: ${purchase.paymentMethod?.toUpperCase() || 'QRIS'}\n✨ *Poin Wardah Diperoleh*: +${Math.floor(purchase.totalAmount / 10000)} Poin Reward\n\n📱 *Beauty Passport Digital*:\nKakak bisa melihat riwayat lengkap dan menukarkan poin reward di link berikut:\n${passportLink}\n\n_Your Beauty Journey Our Priority 💙_\n*Wardah Beauty Advisor*`;
+    const text = `Halo Kak *${cust.fullName}*! ✨\n\nTerima kasih telah berkunjung dan berbelanja produk Wardah di counter resmi kami hari ini.\n\nBerikut rincian struk belanja Kakak:\n📄 *No. Struk*: #${purchase.invoiceNo}\n📅 *Waktu*: ${formatDateTime(purchase.purchasedAt)}\n\n🛍️ *Daftar Produk yang Dibeli*:\n${itemsSummary}\n\n💰 *Total Belanja*: *${formatIDR(purchase.totalAmount)}*\n✨ *Poin Wardah Diperoleh*: +${Math.floor(purchase.totalAmount / 10000)} Poin Reward\n\n📱 *Beauty Passport Digital*:\nKakak bisa melihat riwayat lengkap dan menukarkan poin reward di link berikut:\n${passportLink}\n\n_Your Beauty Journey Our Priority 💙_\n*Wardah Beauty Advisor*`;
 
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
   };
@@ -1242,87 +1222,7 @@ function BaScanAndBarcodeContent() {
                         ))}
                       </div>
 
-                      {/* Payment Method Pills */}
-                      <div className="pt-2 border-t border-gray-200/80 space-y-2">
-                        <label className="text-[11px] font-bold text-gray-700 block">
-                          Metode Pembayaran Kasir:
-                        </label>
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {(
-                            [
-                              { id: 'qris', label: 'QRIS', icon: Smartphone },
-                              { id: 'cash', label: 'Tunai', icon: Banknote },
-                              { id: 'debit', label: 'Debit', icon: CreditCard },
-                              { id: 'transfer', label: 'Transfer', icon: Building },
-                            ] as const
-                          ).map((m) => {
-                            const Icon = m.icon;
-                            const isSelected = paymentMethod === m.id;
-                            return (
-                              <button
-                                key={m.id}
-                                type="button"
-                                onClick={() => setPaymentMethod(m.id)}
-                                className={`py-2 px-1 rounded-xl border text-xs font-bold flex items-center justify-center gap-1 transition-all ${
-                                  isSelected
-                                    ? 'bg-[#277A73] text-white border-[#277A73] shadow-xs'
-                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                                }`}
-                              >
-                                <Icon className="w-3.5 h-3.5 shrink-0" />
-                                <span className="truncate">{m.label}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Tunai Calculator */}
-                        {paymentMethod === 'cash' && (
-                          <div className="p-2.5 bg-white rounded-xl border border-gray-200 space-y-2 animate-in fade-in">
-                            <div className="flex items-center justify-between text-xs">
-                              <label className="font-bold text-gray-700">Uang Diterima:</label>
-                              <div className="flex items-center gap-1">
-                                <span className="text-gray-400 font-bold">Rp</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  placeholder={totalAmount.toString()}
-                                  value={cashTendered}
-                                  onChange={(e) => setCashTendered(e.target.value ? Number(e.target.value) : '')}
-                                  className="w-28 px-2 py-1 text-right font-black border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-[#277A73]"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-1 text-[10px]">
-                              {[
-                                { label: 'Uang Pas', val: totalAmount },
-                                { label: '50rb', val: 50000 },
-                                { label: '100rb', val: 100000 },
-                                { label: '200rb', val: 200000 },
-                                { label: '500rb', val: 500000 },
-                              ].map((p, idx) => (
-                                <button
-                                  key={idx}
-                                  type="button"
-                                  onClick={() => setCashTendered(p.val)}
-                                  className="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-md transition-colors"
-                                >
-                                  {p.label}
-                                </button>
-                              ))}
-                            </div>
-
-                            <div className="flex justify-between items-center text-xs font-bold pt-1 border-t border-gray-100">
-                              <span className="text-gray-600">Kembalian:</span>
-                              <span className={cashChange >= 0 ? 'text-emerald-600 font-black' : 'text-rose-500'}>
-                                {formatIDR(cashChange)}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Collapsible Invoice & Notes */}
+                      {/* Collapsible Invoice & Notes */}
                         <div className="pt-1">
                           <button
                             type="button"
@@ -1402,7 +1302,6 @@ function BaScanAndBarcodeContent() {
                           )}
                         </button>
                       </div>
-                    </div>
                   ) : (
                     <div className="p-4 bg-gray-50/80 rounded-2xl border border-dashed border-gray-200 text-center text-xs text-gray-500">
                       Keranjang belanja masih kosong. Klik <strong>&apos;+ Tambah&apos;</strong> pada produk di atas untuk mencatat pembelian customer.
@@ -1653,24 +1552,7 @@ function BaScanAndBarcodeContent() {
                   <span>Total Belanja:</span>
                   <span className="text-[#277A73]">{formatIDR(selectedReceipt.totalAmount)}</span>
                 </div>
-                <div className="flex justify-between text-[11px] text-gray-600 capitalize">
-                  <span>Metode Bayar:</span>
-                  <span className="font-bold">{selectedReceipt.paymentMethod?.toUpperCase() || 'QRIS'}</span>
-                </div>
-                {selectedReceipt.cashReceived && (
-                  <>
-                    <div className="flex justify-between text-[11px] text-gray-600">
-                      <span>Uang Diterima:</span>
-                      <span>{formatIDR(selectedReceipt.cashReceived)}</span>
-                    </div>
-                    <div className="flex justify-between text-[11px] text-gray-600">
-                      <span>Kembalian:</span>
-                      <span className="font-bold text-emerald-600">
-                        {formatIDR(selectedReceipt.cashChange || 0)}
-                      </span>
-                    </div>
-                  </>
-                )}
+
                 <div className="flex justify-between text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg font-bold">
                   <span>Poin Reward Bertambah:</span>
                   <span>+{Math.floor(selectedReceipt.totalAmount / 10000)} Poin</span>

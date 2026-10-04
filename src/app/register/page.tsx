@@ -17,6 +17,9 @@ import {
   Smartphone,
   User,
   MapPin,
+  Lock,
+  Eye,
+  EyeOff,
   ArrowRight,
   CheckCircle2,
   AlertCircle,
@@ -31,6 +34,7 @@ function RegisterFormContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Prefill phone and name from URL query if available
   const initialPhone = searchParams.get('phone') || '';
@@ -48,8 +52,9 @@ function RegisterFormContent() {
   const form = useForm<CustomerRegisterFormValues>({
     resolver: zodResolver(customerRegisterSchema),
     defaultValues: {
-      fullName: initialName,
       phone: initialPhone,
+      fullName: initialName,
+      password: '',
       city: '',
     },
   });
@@ -64,8 +69,9 @@ function RegisterFormContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fullName: data.fullName,
           phone: data.phone,
+          fullName: data.fullName,
+          password: data.password,
           city: data.city,
         }),
       });
@@ -160,9 +166,33 @@ function RegisterFormContent() {
               </div>
             )}
 
-            {/* Register Form: Only Nama Lengkap, Nomor HP, Kota */}
+            {/* Register Form: Nomor HP, Nama Lengkap, Password, Kota */}
             <form onSubmit={form.handleSubmit(handleRegister)} className="space-y-4">
-              {/* Nama Lengkap */}
+              {/* 1. Nomor HP / WhatsApp */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-[#277A73]" />
+                  <span>Nomor WhatsApp / HP</span>
+                  <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  placeholder="Contoh: 081234567890"
+                  {...form.register('phone')}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#277A73] focus:bg-white focus:ring-3 focus:ring-[#277A73]/10 transition-all placeholder:text-gray-400"
+                />
+                {form.formState.errors.phone ? (
+                  <p className="text-xs text-rose-500 mt-1">
+                    {form.formState.errors.phone.message}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Nomor ini digunakan untuk login & menerima poin reward belanja
+                  </p>
+                )}
+              </div>
+
+              {/* 2. Nama Lengkap */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-[#277A73]" />
@@ -182,31 +212,37 @@ function RegisterFormContent() {
                 )}
               </div>
 
-              {/* Nomor HP */}
+              {/* 3. Password */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
-                  <Smartphone className="w-3.5 h-3.5 text-[#277A73]" />
-                  <span>Nomor WhatsApp / HP</span>
+                  <Lock className="w-3.5 h-3.5 text-[#277A73]" />
+                  <span>Password</span>
                   <span className="text-rose-500">*</span>
                 </label>
-                <input
-                  type="tel"
-                  placeholder="Contoh: 081234567890"
-                  {...form.register('phone')}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#277A73] focus:bg-white focus:ring-3 focus:ring-[#277A73]/10 transition-all placeholder:text-gray-400"
-                />
-                {form.formState.errors.phone ? (
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Minimal 6 karakter"
+                    {...form.register('password')}
+                    className="w-full px-4 py-3 pr-11 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#277A73] focus:bg-white focus:ring-3 focus:ring-[#277A73]/10 transition-all placeholder:text-gray-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                    title={showPassword ? 'Sembunyikan password' : 'Lihat password'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-gray-400" />}
+                  </button>
+                </div>
+                {form.formState.errors.password && (
                   <p className="text-xs text-rose-500 mt-1">
-                    {form.formState.errors.phone.message}
-                  </p>
-                ) : (
-                  <p className="text-[11px] text-gray-400 mt-1">
-                    Nomor ini akan digunakan untuk login & menerima poin reward
+                    {form.formState.errors.password.message}
                   </p>
                 )}
               </div>
 
-              {/* Kota */}
+              {/* 4. Kota Domisili */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-[#277A73]" />
