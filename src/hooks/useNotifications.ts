@@ -22,20 +22,26 @@ export function useNotifications() {
 
     setLoading(true);
 
-    // Real-time listener for customer's notifications
+    // Real-time listener for customer's notifications with in-memory sorting
     const q = query(
       collection(db, 'notifications'),
-      where('customerId', '==', customer.id),
-      orderBy('createdAt', 'desc')
+      where('customerId', '==', customer.id)
     );
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const notifs = snapshot.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        })) as CustomerNotification[];
+        const notifs = snapshot.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            createdAt: data.createdAt?.toDate?.()?.toISOString() ?? (typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString()),
+          };
+        }) as CustomerNotification[];
+
+        // Sort descending by createdAt
+        notifs.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
         setNotifications(notifs);
         const unread = notifs.filter((n) => !n.isRead).length;

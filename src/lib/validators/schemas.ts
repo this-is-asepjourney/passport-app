@@ -19,23 +19,32 @@ export const loginPhoneSchema = z.object({
   password: z.string().min(6, 'Password minimal 6 karakter'),
 });
 
+// Customer Login by Name and Phone
+export const customerLoginSchema = z.object({
+  fullName: z.string().min(2, 'Nama minimal 2 karakter').max(100),
+  phone: z
+    .string()
+    .min(8, 'Nomor HP minimal 8 digit')
+    .max(20, 'Nomor HP maksimal 20 digit')
+    .regex(/^(\+62|62|0)?8[0-9]{6,13}$/, 'Format nomor HP tidak valid (contoh: 081234567890)'),
+});
+
 export const otpSchema = z.object({
   otp: z.string().length(6, 'OTP harus 6 digit').regex(/^\d+$/, 'OTP hanya angka'),
 });
 
-export const registerSchema = z.object({
-  fullName: z.string().min(2, 'Nama minimal 2 karakter').max(100),
+// Customer Register by Name, Phone, and City only
+export const customerRegisterSchema = z.object({
+  fullName: z.string().min(2, 'Nama lengkap minimal 2 karakter').max(100),
   phone: z
     .string()
-    .regex(/^(\+62|62|0)?8[0-9]{6,12}$/, 'Nomor HP tidak valid'),
-  password: z.string().min(6, 'Password minimal 6 karakter'),
-  birthDate: z.string().optional(),
-  gender: z.enum(['male', 'female']).optional(),
-  city: z.string().max(100).optional(),
-  consentAgreed: z.boolean().refine(val => val === true, {
-    message: 'Anda harus menyetujui kebijakan privasi',
-  }),
+    .min(8, 'Nomor HP minimal 8 digit')
+    .max(20, 'Nomor HP maksimal 20 digit')
+    .regex(/^(\+62|62|0)?8[0-9]{6,13}$/, 'Format nomor HP tidak valid (contoh: 081234567890)'),
+  city: z.string().min(2, 'Kota domisili minimal 2 karakter').max(100),
 });
+
+export const registerSchema = customerRegisterSchema;
 
 // ---- Purchase schemas ----
 export const purchaseItemSchema = z.object({
@@ -96,8 +105,10 @@ export const productCategorySchema = z.object({
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type PhoneFormValues = z.infer<typeof phoneSchema>;
 export type LoginPhoneFormValues = z.infer<typeof loginPhoneSchema>;
+export type CustomerLoginFormValues = z.infer<typeof customerLoginSchema>;
 export type OtpFormValues = z.infer<typeof otpSchema>;
-export type RegisterFormValues = z.infer<typeof registerSchema>;
+export type CustomerRegisterFormValues = z.infer<typeof customerRegisterSchema>;
+export type RegisterFormValues = CustomerRegisterFormValues;
 export type RecordPurchaseFormValues = z.infer<typeof recordPurchaseSchema>;
 export type VoidPurchaseFormValues = z.infer<typeof voidPurchaseSchema>;
 export type QuickRegisterCustomerFormValues = z.infer<typeof quickRegisterCustomerSchema>;

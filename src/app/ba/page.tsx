@@ -61,20 +61,38 @@ export default function BaDashboardPage() {
     }
 
     const loadData = async () => {
-      if (!user?.storeId) return setDataLoading(false);
       try {
-        const today = new Date().toISOString().slice(0, 10);
-        const summaryId = `${today}_${user.storeId}`;
+        let activeStoreId = user?.storeId;
+        if (!activeStoreId && user?.uid) {
+          const baProfDoc = await getDoc(doc(db, 'baProfiles', user.uid));
+          if (baProfDoc.exists() && baProfDoc.data()?.storeId) {
+            activeStoreId = baProfDoc.data()!.storeId;
+          }
+        }
 
-        // Fetch store, daily summary, customers, and featured product concurrently
-        const [storeDoc, summaryDoc, customerDocsSnap, productsSnap] = await Promise.all([
-          getDoc(doc(db, 'stores', user.storeId)),
-          getDoc(doc(db, 'dailySalesSummary', summaryId)),
+        // If storeId is missing or doesn't match an existing doc, fallback to first store
+        let storeDoc = activeStoreId ? await getDoc(doc(db, 'stores', activeStoreId)) : null;
+        if (!storeDoc || !storeDoc.exists()) {
+          const fallbackStores = await getDocs(query(collection(db, 'stores'), limit(1)));
+          if (!fallbackStores.empty) {
+            storeDoc = fallbackStores.docs[0];
+            activeStoreId = storeDoc.id;
+          }
+        }
+
+        if (storeDoc && storeDoc.exists()) {
+          setStoreName(storeDoc.data()!.name);
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+        const summaryId = activeStoreId ? `${today}_${activeStoreId}` : '';
+
+        // Fetch daily summary, customers, and featured product concurrently
+        const [summaryDoc, customerDocsSnap, productsSnap] = await Promise.all([
+          summaryId ? getDoc(doc(db, 'dailySalesSummary', summaryId)) : Promise.resolve({ exists: () => false, data: () => null } as any),
           getDocs(query(collection(db, 'customers'))),
           getDocs(query(collection(db, 'products'), where('isActive', '==', true), limit(1))),
         ]);
-
-        if (storeDoc.exists()) setStoreName(storeDoc.data()!.name);
 
         let ordersToday = 0;
         let totalSales = 0;

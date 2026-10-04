@@ -9,7 +9,7 @@ import {
   ReactNode,
 } from 'react';
 import { User as FirebaseUser, onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, query, where, limit, getDocs } from 'firebase/firestore';
+import { collection, query, where, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/client';
 import type { UserRole, CustomClaims, Customer } from '@/types';
 
@@ -49,10 +49,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchCustomerProfile = useCallback(async (uid: string) => {
     try {
+      // 1. Try finding by uid field
       const q = query(collection(db, 'customers'), where('uid', '==', uid), limit(1));
       const snap = await getDocs(q);
       if (!snap.empty) {
         setCustomer({ id: snap.docs[0].id, ...snap.docs[0].data() } as Customer);
+        return;
+      }
+
+      // 2. Fallback: direct doc lookup by ID (in case customer ID is uid)
+      const directDoc = await getDoc(doc(db, 'customers', uid));
+      if (directDoc.exists()) {
+        setCustomer({ id: directDoc.id, ...directDoc.data() } as Customer);
+        return;
       }
     } catch (e) {
       console.warn('Customer profile load error:', e);

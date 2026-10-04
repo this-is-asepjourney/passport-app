@@ -73,11 +73,12 @@ export default function RegionalReportPage() {
         id: doc.id,
         regionId: doc.data().regionId as string | undefined,
         registeredStoreId: doc.data().registeredStoreId as string | undefined,
-        createdAt: doc.data().createdAt as string | undefined,
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() ?? (typeof doc.data().createdAt === 'string' ? doc.data().createdAt : undefined),
       }));
 
       const purchList = purchSnap.docs.map(doc => ({
         id: doc.id,
+        customerId: doc.data().customerId as string | undefined,
         regionId: doc.data().regionId as string | undefined,
         storeId: doc.data().storeId as string | undefined,
         totalAmount: (doc.data().totalAmount as number) || 0,
@@ -116,19 +117,21 @@ export default function RegionalReportPage() {
           return false;
         }).length;
 
-        // Count Customers whose regionId matches, or registered in store belonging to region
-        const regionCustomerCount = filteredCustomers.filter(c => {
-          if (c.regionId === r.id) return true;
-          if (c.registeredStoreId && storeIdSet.has(c.registeredStoreId)) return true;
-          return false;
-        }).length;
-
         // Sum Sales for this region
         const regionPurchases = validPurchases.filter(p => {
           if (p.regionId === r.id) return true;
           if (p.storeId && storeIdSet.has(p.storeId)) return true;
           return false;
         });
+
+        // Count Customers whose regionId matches, registered in region store, or bought in region store
+        const regionCustIdSet = new Set(regionPurchases.map(p => p.customerId).filter(Boolean));
+        const regionCustomerCount = filteredCustomers.filter(c => {
+          if (c.regionId === r.id) return true;
+          if (c.registeredStoreId && storeIdSet.has(c.registeredStoreId)) return true;
+          if (regionCustIdSet.has(c.id)) return true;
+          return false;
+        }).length;
 
         const totalSales = regionPurchases.reduce((sum, p) => sum + p.totalAmount, 0);
         const totalTransactions = regionPurchases.length;

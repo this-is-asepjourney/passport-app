@@ -61,7 +61,11 @@ export default function AdminDashboardPage() {
         getDocs(collection(db, 'regions')),
       ]);
 
-      const custList = custSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Customer[];
+      const custList = custSnap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        createdAt: d.data().createdAt?.toDate?.()?.toISOString() ?? (typeof d.data().createdAt === 'string' ? d.data().createdAt : new Date().toISOString()),
+      })) as Customer[];
       const purchList = purchSnap.docs.map(d => ({
         id: d.id,
         ...d.data(),

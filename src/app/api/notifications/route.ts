@@ -33,17 +33,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ notifications: [] });
     }
 
-    // Ambil notifikasi untuk customerId ini
-    const notifSnap = await db.collection('notifications')
-      .where('customerId', '==', customerId)
-      .orderBy('createdAt', 'desc')
-      .limit(50)
-      .get();
+    // Ambil notifikasi untuk customerId ini dengan fallback sorting
+    let notifDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+    try {
+      const notifSnap = await db.collection('notifications')
+        .where('customerId', '==', customerId)
+        .orderBy('createdAt', 'desc')
+        .limit(50)
+        .get();
+      notifDocs = notifSnap.docs;
+    } catch {
+      const notifSnap = await db.collection('notifications')
+        .where('customerId', '==', customerId)
+        .limit(100)
+        .get();
+      notifDocs = notifSnap.docs.sort((a, b) => {
+        const tA = a.data().createdAt?.toMillis?.() ?? new Date(a.data().createdAt || 0).getTime();
+        const tB = b.data().createdAt?.toMillis?.() ?? new Date(b.data().createdAt || 0).getTime();
+        return tB - tA;
+      });
+    }
 
-    const notifications: CustomerNotification[] = notifSnap.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    } as CustomerNotification));
+    const notifications: CustomerNotification[] = notifDocs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate?.()?.toISOString() ?? (typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString()),
+      } as CustomerNotification;
+    });
 
     return NextResponse.json({ notifications });
   } catch (error: any) {
