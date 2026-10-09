@@ -81,6 +81,7 @@ export interface ProductCategory {
   slug?: string;
   description?: string;
   icon?: string;
+  mainCategory?: string;
 }
 
 export interface Product {
@@ -96,6 +97,11 @@ export interface Product {
   suitableSkinTypes?: string[];
   suitableConcerns?: string[];
   routineStep?: string;
+  barcode?: string;
+  sapCode?: string;
+  odooCode?: string;
+  series?: string;
+  mainCategory?: string;
 }
 
 export type PurchaseStatus = 'valid' | 'void';

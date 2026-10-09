@@ -25,7 +25,6 @@ import {
   Sparkles,
   Printer,
   Share2,
-  Smartphone,
   RotateCcw,
   ChevronDown,
   Receipt,
@@ -335,7 +334,11 @@ function BaScanAndBarcodeContent() {
         const q = productSearch.toLowerCase().trim();
         const matchesName = p.name.toLowerCase().includes(q);
         const matchesSku = p.sku?.toLowerCase().includes(q);
-        return matchesName || matchesSku;
+        const matchesBarcode = (p.barcode || '').toLowerCase().includes(q);
+        const matchesSap = (p.sapCode || '').toLowerCase().includes(q);
+        const matchesOdoo = (p.odooCode || '').toLowerCase().includes(q);
+        const matchesSeries = (p.series || '').toLowerCase().includes(q);
+        return matchesName || matchesSku || matchesBarcode || matchesSap || matchesOdoo || matchesSeries;
       }
 
       return true;
@@ -1051,7 +1054,7 @@ function BaScanAndBarcodeContent() {
                           type="text"
                           value={productSearch}
                           onChange={(e) => setProductSearch(e.target.value)}
-                          placeholder="Cari produk Wardah (nama atau SKU, misal: Sunscreen, Hydra Rose)..."
+                          placeholder="Scan barcode EAN-13 atau cari nama, SKU, series Wardah..."
                           className="w-full pl-10 pr-8 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-[#277A73] focus:bg-white transition-all"
                         />
                         {productSearch && (
@@ -1095,8 +1098,8 @@ function BaScanAndBarcodeContent() {
                       </div>
 
                       {/* Quick-Pick Product Cards Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
-                        {filteredProducts.slice(0, 12).map((prod) => {
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
+                        {filteredProducts.slice(0, 30).map((prod) => {
                           const inCart = cartItems.find((ci) => ci.productId === prod.id);
                           return (
                             <div
@@ -1111,13 +1114,24 @@ function BaScanAndBarcodeContent() {
                                 <p className="font-bold text-gray-900 truncate group-hover:text-[#277A73] transition-colors text-xs">
                                   {prod.name}
                                 </p>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                  <span className="text-[10px] text-gray-400 font-mono">{prod.sku || 'WRD'}</span>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  {prod.barcode ? (
+                                    <span className="text-[9px] text-gray-500 font-mono bg-gray-100 px-1.5 py-0.5 rounded">
+                                      {prod.barcode}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-gray-400 font-mono">{prod.sku || 'WRD'}</span>
+                                  )}
+                                  {prod.series && (
+                                    <span className="text-[9px] font-semibold text-[#277A73] bg-[#E8F6F4] px-1.5 py-0.5 rounded truncate max-w-[120px]">
+                                      {prod.series}
+                                    </span>
+                                  )}
                                   <span className="text-[10px] font-bold text-[#277A73]">
                                     {formatIDR(prod.defaultPrice)}
                                   </span>
                                   {inCart && (
-                                    <span className="text-[9px] font-bold text-[#277A73] bg-[#E8F6F4] px-1.5 py-0.2 rounded-full">
+                                    <span className="text-[9px] font-bold text-[#277A73] bg-[#E8F6F4] px-1.5 py-0.5 rounded-full">
                                       {inCart.qty}x
                                     </span>
                                   )}

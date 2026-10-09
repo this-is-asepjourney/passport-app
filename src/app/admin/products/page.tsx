@@ -16,7 +16,7 @@ import {
   serverTimestamp,
   setDoc,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { auth, db } from '@/lib/firebase/client';
 import type { Product, ProductCategory } from '@/types';
 import { formatIDR } from '@/lib/utils';
 import { useForm, Controller } from 'react-hook-form';
@@ -37,13 +37,16 @@ import {
   Search,
   Filter,
   CheckCircle2,
-  XCircle,
   Tag,
   Sparkles,
   AlertCircle,
   DollarSign,
   Boxes,
+  FileSpreadsheet,
+  UploadCloud,
+  Check,
 } from 'lucide-react';
+import { parseWardahOrderExcel, type WardahExcelParseResult } from '@/lib/products/excel-parser';
 
 const STANDARD_KAHF_CATEGORIES = [
   { name: 'Facial Wash & Cleanser', slug: 'cleanser', icon: '🧴', description: 'Pembersih wajah lembut membersihkan pori tanpa membuat kering' },
@@ -112,6 +115,13 @@ export default function AdminProductsPage() {
   const [isCategorySubmitting, setIsCategorySubmitting] = useState(false);
   const [deletingCategory, setDeletingCategory] = useState<ProductCategory | null>(null);
   const [seedingCategories, setSeedingCategories] = useState(false);
+
+  // Import Excel Modal State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importParseResult, setImportParseResult] = useState<WardahExcelParseResult | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importFeedback, setImportFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Product Form Hook
   const {
@@ -424,12 +434,12 @@ export default function AdminProductsPage() {
   };
 
   // Category name resolver
-  const getCategoryDetails = (catIdOrName: string) => {
+  const getCategoryDetails = useCallback((catIdOrName: string) => {
     const found = categories.find(
       c => c.id === catIdOrName || c.slug === catIdOrName || c.name.toLowerCase() === catIdOrName.toLowerCase()
     );
     return found ? { name: found.name, icon: found.icon || '🧴' } : { name: catIdOrName || 'Umum', icon: '🧴' };
-  };
+  }, [categories]);
 
   // KPI Calculations
   const stats = useMemo(() => {
@@ -448,10 +458,14 @@ export default function AdminProductsPage() {
         const q = productSearch.toLowerCase();
         const matchesName = p.name.toLowerCase().includes(q);
         const matchesSku = p.sku.toLowerCase().includes(q);
+        const matchesBarcode = (p.barcode || '').toLowerCase().includes(q);
+        const matchesSap = (p.sapCode || '').toLowerCase().includes(q);
+        const matchesOdoo = (p.odooCode || '').toLowerCase().includes(q);
+        const matchesSeries = (p.series || '').toLowerCase().includes(q);
         const matchesDesc = (p.description || '').toLowerCase().includes(q);
         const catName = getCategoryDetails(p.categoryId).name.toLowerCase();
         const matchesCat = catName.includes(q);
-        if (!matchesName && !matchesSku && !matchesDesc && !matchesCat) return false;
+        if (!matchesName && !matchesSku && !matchesBarcode && !matchesSap && !matchesOdoo && !matchesSeries && !matchesDesc && !matchesCat) return false;
       }
 
       // Category filter
@@ -470,7 +484,7 @@ export default function AdminProductsPage() {
 
       return true;
     });
-  }, [products, productSearch, selectedCategoryFilter, statusFilter, categories]);
+  }, [products, productSearch, selectedCategoryFilter, statusFilter, categories, getCategoryDetails]);
 
   // Filtered Categories
   const filteredCategories = useMemo(() => {
@@ -503,6 +517,18 @@ export default function AdminProductsPage() {
 
         {canManage && (
           <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              onClick={() => {
+                setImportFile(null);
+                setImportParseResult(null);
+                setImportFeedback(null);
+                setIsImportModalOpen(true);
+              }}
+              className="px-4 py-2.5 bg-emerald-700 text-white font-bold text-xs rounded-xl hover:bg-emerald-800 transition-all flex items-center gap-1.5 shadow-md shadow-emerald-700/20"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Import Excel MT</span>
+            </button>
             <button
               onClick={openAddCategoryModal}
               className="px-4 py-2.5 bg-white border border-[#2C5C59]/30 text-[#2C5C59] font-bold text-xs rounded-xl hover:bg-[#E2F0EF] transition-all flex items-center gap-1.5 shadow-sm"
@@ -824,6 +850,16 @@ export default function AdminProductsPage() {
             </div>
 
             <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="relative flex-1 md:w-60">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={categorySearch}
+                  onChange={(e) => setCategorySearch(e.target.value)}
+                  placeholder="Cari kategori..."
+                  className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-[#2C5C59]"
+                />
+              </div>
               {categories.length === 0 && (
                 <button
                   onClick={handleSeedStandardCategories}
@@ -846,7 +882,7 @@ export default function AdminProductsPage() {
 
           {/* Categories Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {categories.map(cat => {
+            {filteredCategories.map(cat => {
               const count = products.filter(
                 p => p.categoryId === cat.id || p.categoryId === cat.slug || p.categoryId === cat.name
               ).length;
@@ -1370,6 +1406,222 @@ export default function AdminProductsPage() {
                 className="flex-1 py-2.5 bg-rose-600 text-white font-bold text-xs rounded-xl hover:bg-rose-700 transition-colors shadow-md shadow-rose-600/20"
               >
                 Hapus Kategori
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* IMPORT EXCEL FORM ORDER MODAL                                  */}
+      {/* ============================================================== */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !isImporting && setIsImportModalOpen(false)} />
+          <div className="relative bg-white rounded-3xl p-6 sm:p-8 shadow-2xl max-w-2xl w-full space-y-5 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-lg text-gray-900">Import Form Order Wardah (.xlsx)</h3>
+                  <p className="text-xs text-gray-500">Sinkronisasi otomatis produk, kategori, barcode & harga</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isImporting}
+                onClick={() => setIsImportModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Feedback alert */}
+            {importFeedback && (
+              <div
+                className={`p-4 rounded-2xl text-xs sm:text-sm flex items-start gap-3 ${
+                  importFeedback.type === 'success'
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                    : 'bg-rose-50 border border-rose-200 text-rose-800'
+                }`}
+              >
+                {importFeedback.type === 'success' ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                )}
+                <div>
+                  <p className="font-bold">{importFeedback.type === 'success' ? 'Sukses!' : 'Peringatan'}</p>
+                  <p className="mt-0.5">{importFeedback.message}</p>
+                </div>
+              </div>
+            )}
+
+            {/* File Upload Drop Area */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-2">
+                Pilih File Form Order Excel (.xlsx)
+              </label>
+              <div className="border-2 border-dashed border-gray-200 hover:border-emerald-500 rounded-2xl p-6 text-center bg-gray-50/50 transition-colors">
+                <input
+                  type="file"
+                  accept=".xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  disabled={isImporting}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setImportFile(file);
+                    setImportFeedback(null);
+                    try {
+                      const buffer = await file.arrayBuffer();
+                      const result = parseWardahOrderExcel(buffer);
+                      setImportParseResult(result);
+                    } catch (err: unknown) {
+                      const msg = err instanceof Error ? err.message : 'Gagal membaca format file Excel.';
+                      setImportFeedback({
+                        type: 'error',
+                        message: msg,
+                      });
+                      setImportParseResult(null);
+                    }
+                  }}
+                  className="hidden"
+                  id="excel-file-input"
+                />
+                <label htmlFor="excel-file-input" className="cursor-pointer block space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+                    <UploadCloud className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-800">
+                      {importFile ? importFile.name : 'Klik untuk memilih file Form Order Wardah'}
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      {importFile ? `${(importFile.size / 1024).toFixed(1)} KB` : 'Format didukung: .xlsx (FORM ORDER WARDAH MT)'}
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Preview Parsing Result */}
+            {importParseResult && (
+              <div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-gray-700">Hasil Pemindaian File:</span>
+                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded-full text-[11px]">
+                    Valid
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-100">
+                    <p className="text-[10px] text-gray-400">Total Produk</p>
+                    <p className="text-sm font-extrabold text-gray-900">{importParseResult.products.length}</p>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-100">
+                    <p className="text-[10px] text-gray-400">Total Kategori</p>
+                    <p className="text-sm font-extrabold text-gray-900">{importParseResult.categories.length}</p>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-100">
+                    <p className="text-[10px] text-gray-400">Kategori Utama</p>
+                    <p className="text-xs font-bold text-emerald-700 truncate">
+                      {importParseResult.summary.mainCategories.join(', ')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Sample first 3 products */}
+                <div>
+                  <p className="text-[11px] font-bold text-gray-500 mb-1.5">Contoh Produk Terdeteksi:</p>
+                  <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
+                    {importParseResult.products.slice(0, 4).map((p, idx) => (
+                      <div key={idx} className="bg-white p-2 rounded-lg text-[11px] flex items-center justify-between border border-gray-100">
+                        <div className="min-w-0 pr-2">
+                          <p className="font-bold text-gray-800 truncate">{p.name}</p>
+                          <p className="text-[10px] text-gray-400">{p.series || p.mainCategory} • Barcode: {p.barcode || '-'}</p>
+                        </div>
+                        <span className="font-bold text-[#2C5C59] shrink-0">{formatIDR(p.defaultPrice)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Smart Upsert Info Notice */}
+            <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl text-[11px] text-blue-700 space-y-1">
+              <p className="font-bold">💡 Metode Smart Upsert (Aman & Tidak Duplikat):</p>
+              <p>
+                Sistem menggunakan SAP Code / Barcode sebagai pengenal unik. Jika produk sudah ada di database, harga dan nama akan diperbarui. Jika baru, akan otomatis ditambahkan ke katalog.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                disabled={isImporting}
+                onClick={() => setIsImportModalOpen(false)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-colors disabled:opacity-50"
+              >
+                Tutup
+              </button>
+              <button
+                type="button"
+                disabled={!importFile || !importParseResult || isImporting}
+                onClick={async () => {
+                  if (!importFile) return;
+                  setIsImporting(true);
+                  setImportFeedback(null);
+                  try {
+                    const token = await auth.currentUser?.getIdToken();
+                    const formData = new FormData();
+                    formData.append('file', importFile);
+
+                    const res = await fetch('/api/admin/products/import', {
+                      method: 'POST',
+                      headers: {
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: formData,
+                    });
+
+                    const data = await res.json();
+                    if (!res.ok) {
+                      throw new Error(data.error || 'Gagal menyinkronkan produk');
+                    }
+
+                    setImportFeedback({
+                      type: 'success',
+                      message: data.message || `Berhasil menyinkronkan produk Wardah!`,
+                    });
+                    await loadData();
+                  } catch (err: unknown) {
+                    const msg = err instanceof Error ? err.message : 'Terjadi kesalahan saat mengimpor.';
+                    setImportFeedback({
+                      type: 'error',
+                      message: msg,
+                    });
+                  } finally {
+                    setIsImporting(false);
+                  }
+                }}
+                className="flex-1 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-emerald-700/20 disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {isImporting ? (
+                  <>
+                    <div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                    <span>Menyinkronkan ke Database...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Mulai Sinkronisasi Sekarang</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

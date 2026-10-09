@@ -33,7 +33,7 @@ export const otpSchema = z.object({
   otp: z.string().length(6, 'OTP harus 6 digit').regex(/^\d+$/, 'OTP hanya angka'),
 });
 
-// Customer Register with Phone, Full Name, Password, and City
+// Customer Register with Phone, Full Name, and City (No password required)
 export const customerRegisterSchema = z.object({
   phone: z
     .string()
@@ -41,7 +41,6 @@ export const customerRegisterSchema = z.object({
     .max(20, 'Nomor HP maksimal 20 digit')
     .regex(/^(\+62|62|0)?8[0-9]{6,13}$/, 'Format nomor HP tidak valid (contoh: 081234567890)'),
   fullName: z.string().min(2, 'Nama lengkap minimal 2 karakter').max(100),
-  password: z.string().min(6, 'Password minimal 6 karakter'),
   city: z.string().min(2, 'Kota domisili minimal 2 karakter').max(100),
 });
 

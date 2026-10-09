@@ -17,9 +17,6 @@ import {
   Smartphone,
   User,
   MapPin,
-  Lock,
-  Eye,
-  EyeOff,
   ArrowRight,
   CheckCircle2,
   AlertCircle,
@@ -34,7 +31,6 @@ function RegisterFormContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
 
   // Prefill phone and name from URL query if available
   const initialPhone = searchParams.get('phone') || '';
@@ -54,7 +50,6 @@ function RegisterFormContent() {
     defaultValues: {
       phone: initialPhone,
       fullName: initialName,
-      password: '',
       city: '',
     },
   });
@@ -71,7 +66,6 @@ function RegisterFormContent() {
         body: JSON.stringify({
           phone: data.phone,
           fullName: data.fullName,
-          password: data.password,
           city: data.city,
         }),
       });
@@ -166,8 +160,14 @@ function RegisterFormContent() {
               </div>
             )}
 
-            {/* Register Form: Nomor HP, Nama Lengkap, Password, Kota */}
+            {/* Register Form: Nomor HP, Nama Lengkap, Kota */}
             <form onSubmit={form.handleSubmit(handleRegister)} className="space-y-4">
+              <div className="p-3 bg-[#E8F6F4]/50 border border-[#277A73]/15 rounded-2xl mb-2 text-center">
+                <p className="text-xs text-[#277A73] font-semibold">
+                  Daftar instan tanpa password dengan Nama & Nomor WhatsApp
+                </p>
+              </div>
+
               {/* 1. Nomor HP / WhatsApp */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
@@ -212,37 +212,7 @@ function RegisterFormContent() {
                 )}
               </div>
 
-              {/* 3. Password */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-[#277A73]" />
-                  <span>Password</span>
-                  <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Minimal 6 karakter"
-                    {...form.register('password')}
-                    className="w-full px-4 py-3 pr-11 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#277A73] focus:bg-white focus:ring-3 focus:ring-[#277A73]/10 transition-all placeholder:text-gray-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
-                    title={showPassword ? 'Sembunyikan password' : 'Lihat password'}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-gray-400" />}
-                  </button>
-                </div>
-                {form.formState.errors.password && (
-                  <p className="text-xs text-rose-500 mt-1">
-                    {form.formState.errors.password.message}
-                  </p>
-                )}
-              </div>
-
-              {/* 4. Kota Domisili */}
+              {/* 3. Kota Domisili */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-[#277A73]" />

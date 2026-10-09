@@ -64,13 +64,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!password || typeof password !== 'string' || password.length < 6) {
-      return NextResponse.json(
-        { error: 'Password wajib diisi minimal 6 karakter' },
-        { status: 400 }
-      );
-    }
-
     if (!city || typeof city !== 'string' || city.trim().length < 2) {
       return NextResponse.json(
         { error: 'Kota domisili wajib diisi minimal 2 karakter' },
@@ -127,11 +120,12 @@ export async function POST(request: NextRequest) {
       let uid = customerId;
 
       // Ensure Firebase Auth user exists
-      // Ensure Firebase Auth user exists with password
       try {
         await adminAuth().getUser(uid);
         if (password) {
           await adminAuth().updateUser(uid, { password, displayName: trimmedName });
+        } else {
+          await adminAuth().updateUser(uid, { displayName: trimmedName });
         }
       } catch {
         try {
@@ -147,6 +141,8 @@ export async function POST(request: NextRequest) {
             uid = existingAuth.uid;
             if (password) {
               await adminAuth().updateUser(uid, { password, displayName: trimmedName });
+            } else {
+              await adminAuth().updateUser(uid, { displayName: trimmedName });
             }
           } else {
             await adminAuth().createUser({
@@ -260,11 +256,13 @@ export async function POST(request: NextRequest) {
     const memberNo = generateMemberNo();
     let uid = customerId;
 
-    // Ensure Firebase Auth user exists with password
+    // Ensure Firebase Auth user exists
     try {
       await adminAuth().getUser(uid);
       if (password) {
         await adminAuth().updateUser(uid, { password, displayName: trimmedName });
+      } else {
+        await adminAuth().updateUser(uid, { displayName: trimmedName });
       }
     } catch {
       try {
@@ -280,6 +278,8 @@ export async function POST(request: NextRequest) {
           uid = existingAuth.uid;
           if (password) {
             await adminAuth().updateUser(uid, { password, displayName: trimmedName });
+          } else {
+            await adminAuth().updateUser(uid, { displayName: trimmedName });
           }
         } else {
           await adminAuth().createUser({
