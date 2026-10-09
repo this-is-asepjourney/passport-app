@@ -15,6 +15,7 @@ import {
   deleteDoc,
   serverTimestamp,
   setDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/client';
 import type { Product, ProductCategory } from '@/types';
@@ -122,6 +123,11 @@ export default function AdminProductsPage() {
   const [importParseResult, setImportParseResult] = useState<WardahExcelParseResult | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importFeedback, setImportFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Bulk Selection & Delete State
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // Product Form Hook
   const {
@@ -306,16 +312,70 @@ export default function AdminProductsPage() {
     }
   };
 
-  // Delete Product
+  // Delete Single Product
   const handleDeleteProduct = async () => {
     if (!deletingProduct || !canManage) return;
     try {
       await deleteDoc(doc(db, 'products', deletingProduct.id));
       setProducts(prev => prev.filter(p => p.id !== deletingProduct.id));
+      setSelectedProductIds(prev => {
+        const next = new Set(prev);
+        next.delete(deletingProduct.id);
+        return next;
+      });
       setDeletingProduct(null);
     } catch (err) {
       console.error('Error deleting product:', err);
       alert('Gagal menghapus produk.');
+    }
+  };
+
+  // Selection helpers for select item / select all
+  const toggleSelectProduct = (id: string) => {
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAllProducts = () => {
+    setSelectedProductIds(new Set(products.map((p) => p.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedProductIds(new Set());
+  };
+
+  // Bulk Delete Products Handler using Firestore writeBatch chunks
+  const handleBulkDelete = async () => {
+    if (selectedProductIds.size === 0 || !canManage) return;
+    setIsBulkDeleting(true);
+    try {
+      const idsToDelete = Array.from(selectedProductIds);
+      const chunkSize = 400;
+
+      for (let i = 0; i < idsToDelete.length; i += chunkSize) {
+        const chunk = idsToDelete.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
+        for (const id of chunk) {
+          batch.delete(doc(db, 'products', id));
+        }
+        await batch.commit();
+      }
+
+      setProducts((prev) => prev.filter((p) => !selectedProductIds.has(p.id)));
+      setSelectedProductIds(new Set());
+      setIsBulkDeleteModalOpen(false);
+    } catch (err: unknown) {
+      console.error('Error bulk deleting products:', err);
+      alert('Gagal menghapus produk terpilih.');
+    } finally {
+      setIsBulkDeleting(false);
     }
   };
 
@@ -485,6 +545,34 @@ export default function AdminProductsPage() {
       return true;
     });
   }, [products, productSearch, selectedCategoryFilter, statusFilter, categories, getCategoryDetails]);
+
+  // Filtered products selection state
+  const isAllFilteredSelected = useMemo(() => {
+    if (filteredProducts.length === 0) return false;
+    return filteredProducts.every((p) => selectedProductIds.has(p.id));
+  }, [filteredProducts, selectedProductIds]);
+
+  const isSomeFilteredSelected = useMemo(() => {
+    if (filteredProducts.length === 0) return false;
+    const count = filteredProducts.filter((p) => selectedProductIds.has(p.id)).length;
+    return count > 0 && count < filteredProducts.length;
+  }, [filteredProducts, selectedProductIds]);
+
+  const toggleSelectAllFiltered = () => {
+    if (isAllFilteredSelected) {
+      setSelectedProductIds((prev) => {
+        const next = new Set(prev);
+        filteredProducts.forEach((p) => next.delete(p.id));
+        return next;
+      });
+    } else {
+      setSelectedProductIds((prev) => {
+        const next = new Set(prev);
+        filteredProducts.forEach((p) => next.add(p.id));
+        return next;
+      });
+    }
+  };
 
   // Filtered Categories
   const filteredCategories = useMemo(() => {
@@ -682,6 +770,54 @@ export default function AdminProductsPage() {
             </div>
           </div>
 
+          {/* Bulk Action Bar (muncul saat 1 atau lebih produk dipilih) */}
+          {selectedProductIds.size > 0 && canManage && (
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 px-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center gap-3">
+                <span className="w-8 h-8 rounded-xl bg-rose-600 text-white font-bold text-xs flex items-center justify-center shadow-xs shrink-0">
+                  {selectedProductIds.size}
+                </span>
+                <div>
+                  <p className="text-xs font-bold text-rose-950">
+                    {selectedProductIds.size} produk dipilih
+                  </p>
+                  <p className="text-[11px] text-rose-700">
+                    {selectedProductIds.size === products.length
+                      ? 'Semua produk katalog telah dipilih.'
+                      : `Dari total ${products.length} produk katalog.`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+                {selectedProductIds.size < products.length && (
+                  <button
+                    type="button"
+                    onClick={selectAllProducts}
+                    className="px-3 py-1.5 bg-white border border-rose-200 hover:bg-rose-100 text-rose-800 text-xs font-bold rounded-xl transition-colors shadow-2xs"
+                  >
+                    Pilih Semua ({products.length})
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-xl transition-colors shadow-2xs"
+                >
+                  Batalkan Pilihan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsBulkDeleteModalOpen(true)}
+                  className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-rose-600/20 flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Hapus ({selectedProductIds.size}) Produk</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Products Table */}
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
             {dataLoading ? (
@@ -701,6 +837,20 @@ export default function AdminProductsPage() {
                 <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead className="bg-gray-50 text-gray-500 border-b border-gray-100">
                     <tr>
+                      {canManage && (
+                        <th className="pl-6 pr-2 py-4 w-12 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isAllFilteredSelected}
+                            ref={(el) => {
+                              if (el) el.indeterminate = isSomeFilteredSelected;
+                            }}
+                            onChange={toggleSelectAllFiltered}
+                            className="w-4 h-4 rounded text-[#2C5C59] focus:ring-[#2C5C59] border-gray-300 cursor-pointer accent-[#2C5C59]"
+                            title={isAllFilteredSelected ? 'Batalkan pilihan semua' : 'Pilih semua yang tampil'}
+                          />
+                        </th>
+                      )}
                       <th className="px-6 py-4 font-semibold">Produk</th>
                       <th className="px-6 py-4 font-semibold">SKU / Kode</th>
                       <th className="px-6 py-4 font-semibold">Kategori</th>
@@ -712,14 +862,29 @@ export default function AdminProductsPage() {
                   <tbody className="divide-y divide-gray-100">
                     {filteredProducts.map(product => {
                       const catInfo = getCategoryDetails(product.categoryId);
+                      const isSelected = selectedProductIds.has(product.id);
 
                       return (
                         <tr
                           key={product.id}
                           className={`hover:bg-gray-50/60 transition-colors ${
-                            !product.isActive ? 'opacity-60 bg-gray-50/30' : ''
+                            isSelected
+                              ? 'bg-rose-50/40 hover:bg-rose-50/60'
+                              : !product.isActive
+                              ? 'opacity-60 bg-gray-50/30'
+                              : ''
                           }`}
                         >
+                          {canManage && (
+                            <td className="pl-6 pr-2 py-4 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelectProduct(product.id)}
+                                className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-gray-300 cursor-pointer accent-rose-600"
+                              />
+                            </td>
+                          )}
                           {/* Product Info */}
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
@@ -1620,6 +1785,55 @@ export default function AdminProductsPage() {
                   <>
                     <Check className="w-4 h-4" />
                     <span>Mulai Sinkronisasi Sekarang</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ============================================================== */}
+      {/* BULK DELETE CONFIRMATION MODAL                                 */}
+      {/* ============================================================== */}
+      {isBulkDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !isBulkDeleting && setIsBulkDeleteModalOpen(false)} />
+          <div className="relative bg-white rounded-3xl p-6 sm:p-7 shadow-2xl max-w-md w-full text-center space-y-4 animate-in zoom-in-95">
+            <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+              <Trash2 className="w-7 h-7" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-lg text-gray-900">
+                Hapus {selectedProductIds.size} Produk Sekaligus?
+              </h3>
+              <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                Anda akan menghapus <strong>{selectedProductIds.size} produk</strong> terpilih secara permanen dari database katalog Wardah. Tindakan ini <strong>tidak dapat dibatalkan</strong>.
+              </p>
+            </div>
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isBulkDeleting}
+                onClick={() => setIsBulkDeleteModalOpen(false)}
+                className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold text-xs rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isBulkDeleting}
+                onClick={handleBulkDelete}
+                className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-rose-600/20 disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {isBulkDeleting ? (
+                  <>
+                    <div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                    <span>Menghapus...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Ya, Hapus ({selectedProductIds.size}) Produk</span>
                   </>
                 )}
               </button>
