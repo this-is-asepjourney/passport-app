@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase/client';
 import Link from 'next/link';
+import { resolveMediaUrl } from '@/lib/media';
 import { formatIDR } from '@/lib/utils';
 import type { Purchase, Store } from '@/types';
 import {
@@ -39,6 +40,7 @@ interface BaAccount {
   fullName: string;
   email: string;
   phone: string;
+  photoUrl?: string;
   employeeCode: string;
   storeId: string;
   storeName: string;
@@ -714,8 +716,13 @@ export default function AdminBaPage() {
                         {/* BA Name & Employee Code */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#277A73] to-[#1E6560] text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
-                              {ba.fullName.charAt(0).toUpperCase()}
+                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#277A73] to-[#1E6560] text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0 overflow-hidden">
+                              {ba.photoUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={resolveMediaUrl(ba.photoUrl)} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                ba.fullName.charAt(0).toUpperCase()
+                              )}
                             </div>
                             <div>
                               <p className="font-bold text-gray-900 text-sm leading-tight">

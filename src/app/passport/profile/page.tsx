@@ -8,9 +8,10 @@ import { db } from '@/lib/firebase/client';
 import type { Customer } from '@/types';
 import Link from 'next/link';
 import { PassportBottomNav } from '@/components/passport/PassportBottomNav';
+import { ImageUpload } from '@/components/ImageUpload';
 
 export default function PassportProfilePage() {
-  const { user, loading, signOutUser } = useAuth();
+  const { user, loading, updateUserPhoto, signOutUser } = useAuth();
   const router = useRouter();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
@@ -45,6 +46,17 @@ export default function PassportProfilePage() {
     if (!loading && !user) { router.replace('/login'); return; }
     if (!loading && user) loadData();
   }, [user, loading, loadData, router]);
+
+  const handlePhotoUpload = async (url: string) => {
+    try {
+      await updateUserPhoto(url);
+      setCustomer(prev => prev ? { ...prev, photoUrl: url } : null);
+      setMessage('Foto profil berhasil diperbarui.');
+      setTimeout(() => setMessage(''), 3000);
+    } catch {
+      setMessage('Gagal memperbarui foto profil.');
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,16 +110,21 @@ export default function PassportProfilePage() {
       <div className="px-6 py-6 space-y-6 z-10 relative">
         <div className="bg-white rounded-3xl shadow-sm p-6 border border-gray-100">
           <div className="flex items-center gap-4 mb-6">
-            {customer?.photoUrl ? (
-              <img src={customer.photoUrl} alt="Profile" className="w-16 h-16 rounded-full object-cover shadow-md" />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-[#E2F0EF] text-[#6DB9B2] flex items-center justify-center text-2xl font-bold shadow-sm">
-                {customer?.fullName.charAt(0).toUpperCase()}
-              </div>
-            )}
+            <div className="relative w-18 h-18 shrink-0">
+              <ImageUpload
+                onUploadSuccess={handlePhotoUpload}
+                folder="profiles"
+                currentImage={customer?.photoUrl || undefined}
+                shape="circle"
+                showBadge={true}
+                className="w-18 h-18 shadow-md border-2 border-[#E2F0EF]"
+                label=""
+              />
+            </div>
             <div>
-              <p className="font-bold text-[#2C5C59] text-lg">{customer?.fullName}</p>
+              <p className="font-bold text-[#2C5C59] text-lg">{customer?.fullName || 'Pengguna'}</p>
               <p className="text-sm text-gray-500">{customer?.phone}</p>
+              <p className="text-[11px] text-[#277A73] font-semibold mt-0.5">Ketuk foto untuk mengganti</p>
             </div>
           </div>
 

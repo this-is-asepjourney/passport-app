@@ -62,7 +62,7 @@ const WARDAH_FAVORITES = [
 ];
 
 export default function PassportPage() {
-  const { user, customer, setCustomer, loading, signOutUser } = useAuth();
+  const { user, customer, setCustomer, updateUserPhoto, loading, signOutUser } = useAuth();
   const { unreadCount } = useNotifications();
   const router = useRouter();
   const [recentPurchases, setRecentPurchases] = useState<Purchase[]>([]);
@@ -107,10 +107,9 @@ export default function PassportPage() {
   const handlePhotoUpload = async (url: string) => {
     if (!customer) return;
     try {
-      await updateDoc(doc(db, 'customers', customer.id), { photoUrl: url });
-      setCustomer({ ...customer, photoUrl: url });
+      await updateUserPhoto(url);
     } catch (error) {
-      console.error('Failed to update photo URL in Firestore', error);
+      console.error('Failed to update photo URL', error);
     }
   };
 
@@ -186,24 +185,16 @@ export default function PassportPage() {
         {/* USER PROFILE ROW (Hijab Avatar + Greeting)                     */}
         {/* ============================================================== */}
         <div className="px-6 pt-2 pb-5 relative z-10 flex items-center gap-4">
-          <div className="relative group w-16 h-16 shrink-0">
-            <div className="w-16 h-16 rounded-full overflow-hidden shadow-sm border-2 border-[#E2F0EF] bg-gray-100">
-              <img
-                src={customer.photoUrl || DEFAULT_HIJAB_AVATAR}
-                alt={customer.fullName}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            {/* Upload Button Overlay */}
-            <div className="absolute inset-0 rounded-full overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center bg-black/40">
-              <ImageUpload
-                onUploadSuccess={handlePhotoUpload}
-                folder="profiles"
-                className="w-full h-full opacity-0 absolute inset-0 cursor-pointer"
-                label=""
-              />
-              <span className="text-white text-[10px] font-bold pointer-events-none">Ubah</span>
-            </div>
+          <div className="relative w-16 h-16 shrink-0">
+            <ImageUpload
+              onUploadSuccess={handlePhotoUpload}
+              folder="profiles"
+              currentImage={customer.photoUrl || DEFAULT_HIJAB_AVATAR}
+              shape="circle"
+              showBadge={true}
+              className="w-16 h-16 shadow-sm border-2 border-[#E2F0EF]"
+              label=""
+            />
           </div>
 
           <div className="flex-1 min-w-0">

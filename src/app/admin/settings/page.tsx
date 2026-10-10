@@ -6,9 +6,10 @@ import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase/client';
 import { updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
+import { ImageUpload } from '@/components/ImageUpload';
 
 export default function SettingsPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, updateUserPhoto } = useAuth();
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'system'>('profile');
@@ -283,24 +284,29 @@ export default function SettingsPage() {
               <h2 className="text-xl font-bold text-gray-900 border-b border-gray-100 pb-4">Profil Admin</h2>
               
               <div className="flex items-center gap-6">
-                <div className="w-20 h-20 rounded-full bg-[#E2F0EF] text-[#2C5C59] flex items-center justify-center text-3xl font-bold shadow-inner">
-                  {photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={photoUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
-                  ) : (
-                    (displayName || user?.email || 'A')[0].toUpperCase()
-                  )}
+                <div className="relative w-20 h-20 shrink-0">
+                  <ImageUpload
+                    onUploadSuccess={async (url) => {
+                      setPhotoUrl(url);
+                      await updateUserPhoto(url);
+                      showFeedback('success', 'Foto profil admin berhasil diunggah dan disinkronkan.');
+                    }}
+                    folder="profiles"
+                    currentImage={photoUrl || user?.photoUrl || undefined}
+                    shape="circle"
+                    showBadge={true}
+                    className="w-20 h-20 shadow-md border-2 border-[#E2F0EF]"
+                    label=""
+                  />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-600 block">URL Foto Profil (Opsional)</label>
-                  <input
-                    type="url"
-                    value={photoUrl}
-                    onChange={(e) => setPhotoUrl(e.target.value)}
-                    placeholder="https://example.com/avatar.jpg"
-                    className="w-full sm:w-80 px-3 py-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#6DB9B2]"
-                  />
-                  <p className="text-[11px] text-gray-400">Masukkan tautan gambar profil HTTPS yang valid.</p>
+                  <label className="text-xs font-bold text-gray-700 block">Foto Profil Administrator</label>
+                  <p className="text-xs text-gray-500">
+                    Klik atau ketuk foto di samping untuk mengunggah avatar baru ke Cloudflare R2.
+                  </p>
+                  <p className="text-[11px] text-[#2C5C59] font-semibold">
+                    Otomatis dikompres & disinkronkan ke seluruh sistem admin & layout.
+                  </p>
                 </div>
               </div>
 

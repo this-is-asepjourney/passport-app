@@ -99,8 +99,13 @@ export default function BaLayout({ children }: { children: ReactNode }) {
         {/* User Card */}
         <div className="px-4 pt-4 pb-2">
           <div className="p-3 bg-[#E2F0EF]/50 rounded-2xl border border-[#6DB9B2]/20 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#2C5C59] text-white flex items-center justify-center font-bold text-sm shrink-0">
-              {user?.displayName?.charAt(0)?.toUpperCase() || 'B'}
+            <div className="w-10 h-10 rounded-xl bg-[#2C5C59] text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden shadow-xs">
+              {user?.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={user.photoUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                user?.displayName?.charAt(0)?.toUpperCase() || 'B'
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-gray-900 truncate">

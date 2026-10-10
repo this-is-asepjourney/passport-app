@@ -13,8 +13,15 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'firebasestorage.googleapis.com',
       },
+      {
+        protocol: 'https',
+        hostname: '*.r2.dev',
+      },
     ],
   },
+
+  // Allowed dev origins for local testing
+  allowedDevOrigins: ['192.168.25.109', '172.16.0.2', 'localhost:3000'],
 
   // Env validation
   env: {

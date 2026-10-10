@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth/AuthContext';
 import { auth, db } from '@/lib/firebase/client';
 import { collection, getDocs, query, limit } from 'firebase/firestore';
 import Link from 'next/link';
+import { resolveMediaUrl } from '@/lib/media';
 import type { Store } from '@/types';
 import {
   Users,
@@ -23,6 +24,7 @@ interface UserListItem {
   displayName?: string;
   name?: string;
   email?: string;
+  photoUrl?: string;
   role?: string;
   storeId?: string;
   storeName?: string;
@@ -273,7 +275,7 @@ export default function AdminUsersPage() {
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden ${
                           u.role === 'super_admin'
                             ? 'bg-purple-100 text-purple-700'
                             : u.role === 'admin_region'
@@ -283,7 +285,12 @@ export default function AdminUsersPage() {
                             : 'bg-gray-100 text-gray-600'
                         }`}
                       >
-                        {u.displayName?.charAt(0).toUpperCase() || 'U'}
+                        {u.photoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={resolveMediaUrl(u.photoUrl)} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          u.displayName?.charAt(0).toUpperCase() || 'U'
+                        )}
                       </div>
                       <div className="min-w-0">
                         <p className="font-bold text-gray-900 text-xs truncate">

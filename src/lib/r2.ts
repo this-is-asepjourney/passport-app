@@ -22,3 +22,5 @@ export async function generateUploadUrl(key: string, contentType: string) {
 
   return getSignedUrl(r2, command, { expiresIn: 300 }); // Valid for 5 minutes
 }
+
+export { resolveMediaUrl } from './media';

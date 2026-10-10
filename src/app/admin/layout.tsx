@@ -89,9 +89,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-bold text-gray-900">Halo, {user?.email?.split('@')[0] || 'Admin'}!</p>
-              <p className="text-xs text-gray-500">{user?.role === 'super_admin' ? 'Super Admin' : 'Admin Regional'}</p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#E2F0EF] text-[#2C5C59] flex items-center justify-center font-bold text-sm shadow-xs overflow-hidden border border-[#6DB9B2]/30 shrink-0">
+                {user?.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={user.photoUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  (user?.displayName || user?.email || 'A')[0].toUpperCase()
+                )}
+              </div>
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-bold text-gray-900 leading-tight">Halo, {user?.displayName || user?.email?.split('@')[0] || 'Admin'}!</p>
+                <p className="text-xs text-gray-500 mt-0.5">{user?.role === 'super_admin' ? 'Super Admin' : 'Admin Regional'}</p>
+              </div>
             </div>
             <button 
               onClick={signOutUser}

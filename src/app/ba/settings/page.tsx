@@ -25,9 +25,10 @@ import {
   MapPin,
   BadgeCheck,
 } from 'lucide-react';
+import { ImageUpload } from '@/components/ImageUpload';
 
 export default function BaSettingsPage() {
-  const { user, loading, signOutUser } = useAuth();
+  const { user, loading, updateUserPhoto, signOutUser } = useAuth();
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'preferences'>('profile');
@@ -284,12 +285,22 @@ export default function BaSettingsPage() {
       )}
 
       {/* BA Identity Summary Card */}
-      <div className="bg-gradient-to-r from-[#2C5C59] to-[#1F4240] rounded-3xl p-6 text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white text-2xl font-black shadow-inner border border-white/20">
-            {fullName.charAt(0).toUpperCase() || 'B'}
-          </div>
-          <div>
+      <div className="bg-gradient-to-r from-[#2C5C59] to-[#1F4240] rounded-3xl p-6 text-white shadow-md flex flex-col sm:flex-row sm:items-center gap-5">
+        <div className="relative w-18 h-18 shrink-0">
+          <ImageUpload
+            onUploadSuccess={async (url) => {
+              await updateUserPhoto(url);
+              setFeedback({ type: 'success', message: 'Foto profil Beauty Advisor berhasil diperbarui.' });
+            }}
+            folder="profiles"
+            currentImage={user?.photoUrl || undefined}
+            shape="rounded"
+            showBadge={true}
+            className="w-18 h-18 rounded-2xl shadow-inner border border-white/30 bg-white/10"
+            label=""
+          />
+        </div>
+        <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold">{fullName || 'Beauty Advisor Wardah'}</h2>
               <span className="bg-[#6DB9B2]/30 text-[#A2E0DB] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-[#6DB9B2]/40">
@@ -310,7 +321,7 @@ export default function BaSettingsPage() {
             </div>
           </div>
         </div>
-      </div>
+
 
       {/* Settings Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-gray-200">

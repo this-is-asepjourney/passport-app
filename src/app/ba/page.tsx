@@ -195,8 +195,13 @@ export default function BaDashboardPage() {
               className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-full text-sm focus:outline-none focus:border-[#6DB9B2] focus:ring-2 focus:ring-[#6DB9B2]/20 transition-all shadow-sm"
             />
           </div>
-          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center font-bold text-[#2C5C59] border border-gray-200 shrink-0">
-            {user?.displayName ? user.displayName.charAt(0) : 'BA'}
+          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center font-bold text-[#2C5C59] border border-gray-200 shrink-0 overflow-hidden shadow-xs">
+            {user?.photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.photoUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              user?.displayName ? user.displayName.charAt(0) : 'BA'
+            )}
           </div>
         </div>
       </div>

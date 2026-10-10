@@ -7,6 +7,7 @@ import { doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase/client';
 import type { Customer } from '@/types';
 import { formatIDR } from '@/lib/utils';
+import { resolveMediaUrl } from '@/lib/media';
 import Link from 'next/link';
 import { Bell, Send, CheckCircle2, AlertCircle, Sparkles, ShieldCheck } from 'lucide-react';
 
@@ -214,10 +215,20 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         </Link>
       </div>
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{customer.fullName}</h1>
-          <p className="text-sm text-gray-500">Member ID: {customer.memberNo} • {customer.phone}</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-[#E2F0EF] text-[#2C5C59] flex items-center justify-center font-bold text-2xl shadow-inner overflow-hidden border border-[#6DB9B2]/30 shrink-0">
+            {customer.photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={resolveMediaUrl(customer.photoUrl)} alt="" className="w-full h-full object-cover" />
+            ) : (
+              customer.fullName.charAt(0).toUpperCase()
+            )}
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{customer.fullName}</h1>
+            <p className="text-sm text-gray-500">Member ID: {customer.memberNo} • {customer.phone}</p>
+          </div>
         </div>
         <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
           customer.status === 'active' ? 'bg-green-100 text-green-700' :

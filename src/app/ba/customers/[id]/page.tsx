@@ -19,6 +19,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { recordPurchaseSchema, type RecordPurchaseFormValues } from '@/lib/validators/schemas';
 import type { Customer, Purchase, Product, SkinProfile, Consultation } from '@/types';
 import { formatIDR, formatDateTime, formatDate, maskPhone } from '@/lib/utils';
+import { resolveMediaUrl } from '@/lib/media';
 import Link from 'next/link';
 import QRCode from 'react-qr-code';
 import {
@@ -383,7 +384,7 @@ export default function BaCustomerDetailPage() {
             <div className="relative w-20 h-20 rounded-2xl overflow-hidden shadow-xl border-2 border-white/30 bg-[#234B48] flex items-center justify-center shrink-0">
               {customer.photoUrl && !imageError ? (
                 <img
-                  src={customer.photoUrl}
+                  src={resolveMediaUrl(customer.photoUrl)}
                   alt=""
                   onError={() => setImageError(true)}
                   className="w-full h-full object-cover"
