@@ -277,6 +277,7 @@ async function main() {
         series: prod.series,
         mainCategory: prod.mainCategory,
         isActive: true,
+        createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       };
       if (prod.routineStep) data.routineStep = prod.routineStep;

@@ -94,6 +94,7 @@ export interface Product {
   defaultPrice: number;
   isActive: boolean;
   createdAt: string;
+  updatedAt?: string;
   suitableSkinTypes?: string[];
   suitableConcerns?: string[];
   routineStep?: string;

@@ -46,6 +46,8 @@ import {
   FileSpreadsheet,
   UploadCloud,
   Check,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { parseWardahOrderExcel, type WardahExcelParseResult } from '@/lib/products/excel-parser';
 
@@ -103,6 +105,8 @@ export default function AdminProductsPage() {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [categorySearch, setCategorySearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // Product Modal State
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -162,17 +166,46 @@ export default function AdminProductsPage() {
   const loadData = useCallback(async () => {
     setDataLoading(true);
     try {
-      const [productsSnap, categoriesSnap] = await Promise.all([
-        getDocs(query(collection(db, 'products'), orderBy('createdAt', 'desc'))),
-        getDocs(collection(db, 'productCategories')),
-      ]);
+      let loadedProducts: Product[] = [];
+      try {
+        const pSnap = await getDocs(query(collection(db, 'products'), orderBy('createdAt', 'desc')));
+        if (pSnap.size > 0) {
+          loadedProducts = pSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Product[];
+        } else {
+          const fallbackSnap = await getDocs(collection(db, 'products'));
+          loadedProducts = fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Product[];
+        }
+      } catch {
+        const fallbackSnap = await getDocs(collection(db, 'products'));
+        loadedProducts = fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Product[];
+      }
 
+      const categoriesSnap = await getDocs(collection(db, 'productCategories'));
       const loadedCategories = categoriesSnap.docs.map(d => ({
         id: d.id,
         ...d.data(),
       })) as ProductCategory[];
 
-      setProducts(productsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Product[]);
+      // Sort: newest createdAt or updatedAt first, fallback by name
+      loadedProducts.sort((a, b) => {
+        const getMs = (val: unknown) => {
+          if (!val) return 0;
+          if (typeof val === 'object' && val !== null && 'toMillis' in val && typeof (val as { toMillis: () => number }).toMillis === 'function') {
+            return (val as { toMillis: () => number }).toMillis();
+          }
+          if (typeof val === 'string' || typeof val === 'number') {
+            const t = new Date(val).getTime();
+            return isNaN(t) ? 0 : t;
+          }
+          return 0;
+        };
+        const timeA = Math.max(getMs(a.createdAt), getMs(a.updatedAt));
+        const timeB = Math.max(getMs(b.createdAt), getMs(b.updatedAt));
+        if (timeB !== timeA) return timeB - timeA;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+
+      setProducts(loadedProducts);
       setCategories(loadedCategories);
     } catch (err) {
       console.error('Error loading products & categories:', err);
@@ -546,6 +579,17 @@ export default function AdminProductsPage() {
     });
   }, [products, productSearch, selectedCategoryFilter, statusFilter, categories, getCategoryDetails]);
 
+  // Reset pagination on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [productSearch, selectedCategoryFilter, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredProducts.slice(start, start + pageSize);
+  }, [filteredProducts, currentPage, pageSize]);
+
   // Filtered products selection state
   const isAllFilteredSelected = useMemo(() => {
     if (filteredProducts.length === 0) return false;
@@ -860,7 +904,7 @@ export default function AdminProductsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredProducts.map(product => {
+                    {paginatedProducts.map(product => {
                       const catInfo = getCategoryDetails(product.categoryId);
                       const isSelected = selectedProductIds.has(product.id);
 
@@ -997,6 +1041,60 @@ export default function AdminProductsPage() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {!dataLoading && filteredProducts.length > 0 && (
+              <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 bg-gray-50/50">
+                <div className="flex items-center gap-2">
+                  <span>
+                    Menampilkan <strong>{filteredProducts.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</strong> -{' '}
+                    <strong>{Math.min(currentPage * pageSize, filteredProducts.length)}</strong> dari{' '}
+                    <strong>{filteredProducts.length}</strong> produk
+                  </span>
+                  <span className="text-gray-300">|</span>
+                  <label className="flex items-center gap-1.5 text-gray-500">
+                    <span>Per halaman:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 focus:outline-none focus:border-[#2C5C59]"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={200}>200</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="p-1.5 rounded-lg border border-gray-200 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    title="Halaman Sebelumnya"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="px-3 py-1 font-bold bg-white border border-gray-200 rounded-lg text-gray-800 shadow-2xs">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-1.5 rounded-lg border border-gray-200 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    title="Halaman Selanjutnya"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             )}
           </div>

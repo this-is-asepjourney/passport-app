@@ -26,7 +26,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Token otentikasi tidak valid atau kadaluarsa' }, { status: 401 });
     }
 
-    const role = (decodedToken.role || '').toString();
+    const db = adminDb();
+
+    let role = (decodedToken.role || '').toString();
+    if (!role || (!['super_admin', 'admin_region'].includes(role) && !role.includes('admin'))) {
+      // Fallback: check users collection
+      const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+      role = (userDoc.data()?.role || '').toString();
+    }
+
     if (role !== 'super_admin' && role !== 'admin_region' && !role.includes('admin')) {
       return NextResponse.json({ error: 'Akses ditolak. Fitur ini khusus untuk Administrator.' }, { status: 403 });
     }
@@ -50,8 +58,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Tidak ditemukan produk yang valid dalam file Excel.' }, { status: 400 });
     }
 
-    const db = adminDb();
-
     // 4. Batch Upsert Kategori (productCategories)
     const categoryBatches = [];
     let currentCatBatch = db.batch();
@@ -68,6 +74,7 @@ export async function POST(request: NextRequest) {
           icon: cat.icon,
           mainCategory: cat.mainCategory,
           description: `Katalog resmi ${cat.name} Wardah`,
+          createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }
@@ -106,6 +113,7 @@ export async function POST(request: NextRequest) {
         series: prod.series,
         mainCategory: prod.mainCategory,
         isActive: true,
+        createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       };
 
